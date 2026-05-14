@@ -5,8 +5,10 @@ CLI for saving TikTok videos as Obsidian-friendly Markdown notes. It downloads t
 ## Install
 
 ```powershell
-uv sync
+.\scripts\setup.ps1
 ```
+
+The setup script creates the virtual environment, installs project dependencies, checks NVIDIA/PyTorch GPU support, and prints device diagnostics.
 
 The first real export can take time because `yt-dlp`, Whisper dependencies, and the `turbo` model need to be available locally.
 
@@ -76,7 +78,28 @@ During export the CLI logs the current video, pipeline stage, active transcripti
 If the app still uses CPU, check what PyTorch can see:
 
 ```powershell
+uv run tiktokexport doctor
 uv run python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.version.cuda)"
 ```
 
 If this prints a CPU-only build or `False`, install a CUDA-enabled PyTorch build that matches your NVIDIA driver/CUDA setup.
+
+On Windows, a common cause is a CPU-only torch package inside `.venv`. If `nvidia-smi` sees your GPU but `tiktokexport doctor` shows `torch_version` ending in `+cpu`, fix PyTorch rather than the app.
+
+Recommended path:
+
+1. Update the NVIDIA driver to a current version.
+2. Run `.\scripts\setup.ps1` again.
+3. Re-run `uv run tiktokexport doctor` and confirm `cuda_available` is `True`.
+
+This project is configured to use the official PyTorch CUDA 11.8 wheel index on Windows. CUDA 11.8 requires NVIDIA Windows driver `522.06` or newer.
+
+Manual recovery command if the environment was already created with CPU-only torch:
+
+```powershell
+uv pip uninstall torch torchvision torchaudio
+uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+uv run tiktokexport doctor
+```
+
+If you cannot update the NVIDIA driver and it only supports CUDA 11.7, use an older Python/PyTorch combination that still provides CUDA 11.7 wheels, or create a separate Python 3.10/3.11 environment for this project.

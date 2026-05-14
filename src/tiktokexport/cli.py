@@ -11,6 +11,7 @@ from .config import default_output_dir, init_config, load_config
 from .links import parse_links_file
 from .pipeline import ExportOptions, TikTokExporter
 from .progress import RichExportReporter
+from .transcriber import torch_device_report
 
 
 app = typer.Typer(help="Export TikTok videos into Obsidian-friendly Markdown notes.")
@@ -100,6 +101,26 @@ def export_command(
         raise typer.Exit(code=1)
 
     console.print(f"[green]Done[/green]: exported {len(summary.successes)} video(s).")
+
+
+@app.command("doctor")
+def doctor_command() -> None:
+    """Print local GPU/PyTorch diagnostics."""
+    report = torch_device_report()
+
+    table = Table(title="TikTokExport Device Diagnostics")
+    table.add_column("Check")
+    table.add_column("Value")
+    for key, value in report.items():
+        table.add_row(key, str(value))
+    console.print(table)
+
+    if not report["cuda_available"]:
+        console.print(
+            "[yellow]CUDA is not available to PyTorch in this environment. "
+            "Whisper will run on CPU until a CUDA-enabled torch build and compatible "
+            "NVIDIA driver are installed.[/yellow]"
+        )
 
 
 def _collect_urls(url: str | None, file: Path | None) -> list[str]:

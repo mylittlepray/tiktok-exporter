@@ -13,6 +13,30 @@ class TranscriptionError(RuntimeError):
     pass
 
 
+def torch_device_report() -> dict[str, str | bool | int]:
+    try:
+        import torch
+    except ImportError:
+        return {
+            "torch_installed": False,
+            "torch_version": "not installed",
+            "cuda_available": False,
+            "torch_cuda": "none",
+            "device_count": 0,
+            "device_name": "none",
+        }
+
+    cuda_available = bool(torch.cuda.is_available())
+    return {
+        "torch_installed": True,
+        "torch_version": str(torch.__version__),
+        "cuda_available": cuda_available,
+        "torch_cuda": str(torch.version.cuda or "none"),
+        "device_count": int(torch.cuda.device_count()),
+        "device_name": str(torch.cuda.get_device_name(0) if cuda_available else "none"),
+    }
+
+
 class WhisperTranscriber:
     def __init__(self, model_name: str = "turbo", device: str = "auto") -> None:
         self.model_name = model_name
@@ -34,7 +58,14 @@ class WhisperTranscriber:
                 "openai-whisper is not installed. Run `uv sync` before exporting videos."
             ) from exc
 
-        attempts = _device_attempts(self.device, _cuda_available())
+        cuda_available = _cuda_available()
+        attempts = _device_attempts(self.device, cuda_available)
+        if reporter is not None and self.device == "auto" and not cuda_available:
+            report = torch_device_report()
+            reporter.warning(
+                "CUDA is not available to PyTorch; using CPU. "
+                f"torch={report['torch_version']}, torch_cuda={report['torch_cuda']}"
+            )
         last_error: Exception | None = None
 
         for index, device in enumerate(attempts):

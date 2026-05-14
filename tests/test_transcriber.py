@@ -1,6 +1,6 @@
 import pytest
 
-from tiktokexport.transcriber import TranscriptionError, _device_attempts
+from tiktokexport.transcriber import TranscriptionError, _device_attempts, torch_device_report
 
 
 @pytest.mark.parametrize(
@@ -19,3 +19,11 @@ def test_device_attempts(preference: str, cuda_available: bool, expected: list[s
 def test_device_attempts_rejects_unknown_device() -> None:
     with pytest.raises(TranscriptionError):
         _device_attempts("metal", cuda_available=False)
+
+
+def test_torch_device_report_has_expected_keys() -> None:
+    report = torch_device_report()
+
+    assert "torch_version" in report
+    assert "cuda_available" in report
+    assert "torch_cuda" in report

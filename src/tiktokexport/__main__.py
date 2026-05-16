@@ -1,4 +1,4 @@
-from .cli import app
+from tiktokexport.cli import app
 
 
 if __name__ == "__main__":

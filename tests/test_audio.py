@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tiktokexport.core.audio import (
+from tiktokexport.audio_file.models import AudioTranscriptionOptions
+from tiktokexport.audio_file.pipeline import (
     AudioFileTranscriber,
-    AudioTranscriptionOptions,
     normalize_transcript_format,
     supported_audio_extensions,
 )
@@ -78,4 +78,3 @@ def test_normalize_transcript_format() -> None:
     assert ".mp3" in supported_audio_extensions()
     with pytest.raises(ValueError):
         normalize_transcript_format("srt")
-

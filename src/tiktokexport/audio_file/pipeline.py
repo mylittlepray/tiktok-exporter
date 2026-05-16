@@ -1,19 +1,24 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Literal, Protocol, cast
+from typing import Protocol, cast
 
-import yaml
+from tiktokexport.audio_file.models import (
+    AudioTranscriptionFailure,
+    AudioTranscriptionOptions,
+    AudioTranscriptionSummary,
+    TranscribedAudio,
+    TranscriptFormat,
+)
+from tiktokexport.core.ffmpeg import AUDIO_SUFFIXES, is_audio_file
+from tiktokexport.core.files import ensure_output_dir
+from tiktokexport.core.filenames import sanitize_component, unique_base_path
+from tiktokexport.core.markdown import MarkdownDocument, render_transcript_markdown
+from tiktokexport.core.transcriber import WhisperTranscriber
+from tiktokexport.progress import ExportReporter
 
-from .ffmpeg import AUDIO_SUFFIXES, is_audio_file
-from .filenames import sanitize_component, unique_base_path
-from .transcriber import WhisperTranscriber
-from ..progress import ExportReporter
 
-
-TranscriptFormat = Literal["md", "txt"]
 SUPPORTED_TRANSCRIPT_FORMATS = frozenset({"md", "txt"})
 
 
@@ -24,34 +29,6 @@ class Transcriber(Protocol):
         reporter: ExportReporter | None = None,
     ) -> str:
         ...
-
-
-@dataclass(frozen=True)
-class AudioTranscriptionOptions:
-    output_dir: Path
-    model_name: str = "turbo"
-    device: str = "auto"
-    output_format: TranscriptFormat = "md"
-    fail_fast: bool = False
-    created_at: str | None = None
-
-
-@dataclass(frozen=True)
-class TranscribedAudio:
-    source_path: Path
-    transcript_path: Path
-
-
-@dataclass(frozen=True)
-class AudioTranscriptionFailure:
-    source_path: Path
-    error: str
-
-
-@dataclass(frozen=True)
-class AudioTranscriptionSummary:
-    successes: tuple[TranscribedAudio, ...]
-    failures: tuple[AudioTranscriptionFailure, ...]
 
 
 class AudioFileTranscriber:
@@ -97,9 +74,8 @@ class AudioFileTranscriber:
         transcriber: Transcriber | None = None,
         reporter: ExportReporter | None = None,
     ) -> TranscribedAudio:
-        source_path = _validate_audio_path(path)
-        output_dir = options.output_dir.expanduser().resolve()
-        output_dir.mkdir(parents=True, exist_ok=True)
+        source_path = validate_audio_path(path)
+        output_dir = ensure_output_dir(options.output_dir)
         created_at = options.created_at or date.today().isoformat()
         output_format = normalize_transcript_format(options.output_format)
         transcriber = transcriber or self.transcriber or WhisperTranscriber(
@@ -111,15 +87,15 @@ class AudioFileTranscriber:
             reporter.stage("Transcribing audio file")
         transcript = transcriber.transcribe(source_path, reporter=reporter)
 
-        base = f"{created_at}_{sanitize_component(source_path.stem, fallback='audio')}"
         suffix = f".{output_format}"
+        base = f"{created_at}_{sanitize_component(source_path.stem, fallback='audio')}"
         base = unique_base_path(output_dir, base, (suffix,))
         transcript_path = output_dir / f"{base}{suffix}"
 
         if reporter is not None:
             reporter.stage("Saving transcript")
         transcript_path.write_text(
-            _render_transcript(
+            render_audio_transcript(
                 source_path=source_path,
                 created_at=created_at,
                 transcript=transcript,
@@ -129,6 +105,15 @@ class AudioFileTranscriber:
         )
 
         return TranscribedAudio(source_path=source_path, transcript_path=transcript_path)
+
+
+def collect_audio_files(directory: Path, recursive: bool = False) -> list[Path]:
+    root = directory.expanduser().resolve()
+    if not root.exists() or not root.is_dir():
+        raise ValueError(f"Audio directory does not exist: {directory}")
+
+    iterator = root.rglob("*") if recursive else root.iterdir()
+    return sorted(path for path in iterator if path.is_file() and is_audio_file(path))
 
 
 def normalize_transcript_format(value: str) -> TranscriptFormat:
@@ -142,7 +127,7 @@ def supported_audio_extensions() -> tuple[str, ...]:
     return tuple(sorted(AUDIO_SUFFIXES))
 
 
-def _validate_audio_path(path: Path) -> Path:
+def validate_audio_path(path: Path) -> Path:
     source_path = path.expanduser().resolve()
     if not source_path.exists() or not source_path.is_file():
         raise ValueError(f"Audio file does not exist: {path}")
@@ -153,7 +138,7 @@ def _validate_audio_path(path: Path) -> Path:
     return source_path
 
 
-def _render_transcript(
+def render_audio_transcript(
     *,
     source_path: Path,
     created_at: str,
@@ -164,22 +149,16 @@ def _render_transcript(
     if output_format == "txt":
         return f"{transcript}\n"
 
-    frontmatter = {
-        "created_at": created_at,
-        "tags": ["transcription", "audio"],
-        "source_file": source_path.name,
-        "media_type": "audio",
-    }
-    yaml_body = yaml.safe_dump(
-        frontmatter,
-        allow_unicode=True,
-        sort_keys=False,
-        default_flow_style=False,
-    ).strip()
-
-    return (
-        f"---\n{yaml_body}\n---\n\n"
-        f"# {source_path.stem}\n\n"
-        f"## Транскрипт\n\n"
-        f"{transcript}\n"
+    return render_transcript_markdown(
+        MarkdownDocument(
+            title=source_path.stem,
+            transcript=transcript,
+            frontmatter={
+                "created_at": created_at,
+                "tags": ["transcription", "audio"],
+                "source_file": source_path.name,
+                "media_type": "audio",
+            },
+        )
     )
+

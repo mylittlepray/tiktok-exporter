@@ -7,7 +7,7 @@ from pathlib import Path
 
 from platformdirs import user_cache_dir
 
-from ..config import APP_NAME
+from tiktokexport.config import APP_NAME
 
 
 AUDIO_SUFFIXES = frozenset(

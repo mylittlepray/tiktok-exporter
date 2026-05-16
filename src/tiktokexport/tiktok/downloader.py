@@ -4,8 +4,8 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-from ..core.ffmpeg import imageio_ffmpeg_path
-from .models import DownloadedVideo, VideoMetadata
+from tiktokexport.core.ffmpeg import imageio_ffmpeg_path
+from tiktokexport.tiktok.models import DownloadedVideo, VideoMetadata
 
 
 class TikTokDownloadError(RuntimeError):
@@ -110,4 +110,3 @@ def _account_from_info(info: dict[str, Any]) -> str:
 
 def _fallback_video_id(source_url: str) -> str:
     return hashlib.sha1(source_url.encode("utf-8")).hexdigest()[:12]
-

@@ -7,18 +7,21 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from .config import default_output_dir, init_config, load_config
-from .core.audio import (
-    AudioFileTranscriber,
+from tiktokexport.audio_file.models import (
     AudioTranscriptionFailure,
     AudioTranscriptionOptions,
     TranscriptFormat,
+)
+from tiktokexport.audio_file.pipeline import (
+    AudioFileTranscriber,
+    collect_audio_files,
     normalize_transcript_format,
 )
-from .core.transcriber import torch_device_report
-from .links import parse_links_file
-from .progress import RichExportReporter
-from .tiktok.pipeline import ExportOptions, TikTokExporter
+from tiktokexport.config import default_output_dir, init_config, load_config
+from tiktokexport.core.transcriber import torch_device_report
+from tiktokexport.links import parse_links_file
+from tiktokexport.progress import RichExportReporter
+from tiktokexport.tiktok.pipeline import ExportOptions, TikTokExporter
 
 
 app = typer.Typer(help="Run local Whisper transcription workflows.")
@@ -43,7 +46,7 @@ def init_config_command(
 
 @app.command("export")
 def export_command(
-    url: Optional[str] = typer.Argument(None, help="Single TikTok URL to export."),
+    urls: Optional[list[str]] = typer.Argument(None, help="One or more TikTok URLs to export."),
     file: Optional[Path] = typer.Option(
         None,
         "--file",
@@ -83,7 +86,7 @@ def export_command(
         help="Stop batch processing after the first failed URL.",
     ),
 ) -> None:
-    urls = _collect_urls(url=url, file=file)
+    urls = _collect_urls(urls=urls, file=file)
     device = _validate_device(device)
     output_dir = _resolve_output_dir(out)
     if cookies is not None and (not cookies.exists() or not cookies.is_file()):
@@ -112,7 +115,22 @@ def export_command(
 
 @app.command("transcribe")
 def transcribe_command(
-    files: list[Path] = typer.Argument(..., help="One or more local audio files to transcribe."),
+    files: Optional[list[Path]] = typer.Argument(
+        None,
+        help="One or more local audio files to transcribe.",
+    ),
+    directory: Optional[Path] = typer.Option(
+        None,
+        "--dir",
+        "-d",
+        help="Directory with audio files to transcribe.",
+    ),
+    recursive: bool = typer.Option(
+        False,
+        "--recursive",
+        "-r",
+        help="When --dir is used, include audio files from nested directories.",
+    ),
     out: Optional[Path] = typer.Option(
         None,
         "--out",
@@ -144,10 +162,11 @@ def transcribe_command(
     device = _validate_device(device)
     transcript_format = _validate_transcript_format(output_format)
     output_dir = _resolve_output_dir(out)
+    audio_paths = _collect_audio_paths(files=files, directory=directory, recursive=recursive)
 
     with RichExportReporter(console) as reporter:
         summary = AudioFileTranscriber().transcribe_files(
-            files,
+            audio_paths,
             AudioTranscriptionOptions(
                 output_dir=output_dir,
                 model_name=model,
@@ -185,21 +204,55 @@ def doctor_command() -> None:
         )
 
 
-def _collect_urls(url: str | None, file: Path | None) -> list[str]:
-    if bool(url) == bool(file):
-        raise typer.BadParameter("Pass exactly one input: a TikTok URL or --file links.txt.")
+def _collect_urls(urls: list[str] | None, file: Path | None) -> list[str]:
+    if bool(urls) == bool(file):
+        raise typer.BadParameter("Pass TikTok URL(s) or --file links.txt.")
 
     if file is not None:
         if not file.exists() or not file.is_file():
             raise typer.BadParameter(f"Links file does not exist: {file}")
-        urls = parse_links_file(file)
+        collected = parse_links_file(file)
     else:
-        urls = [url.strip()] if url else []
+        collected = _dedupe_non_empty_urls(urls or [])
 
-    if not urls:
+    if not collected:
         raise typer.BadParameter("No TikTok URLs found.")
 
-    return urls
+    return collected
+
+
+def _dedupe_non_empty_urls(urls: list[str]) -> list[str]:
+    collected: list[str] = []
+    seen: set[str] = set()
+    for raw_url in urls:
+        url = raw_url.strip()
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        collected.append(url)
+    return collected
+
+
+def _collect_audio_paths(
+    files: list[Path] | None,
+    directory: Path | None,
+    recursive: bool,
+) -> list[Path]:
+    if bool(files) == bool(directory):
+        raise typer.BadParameter("Pass audio file(s) or --dir audio-folder.")
+
+    if directory is not None:
+        try:
+            paths = collect_audio_files(directory, recursive=recursive)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+    else:
+        paths = list(files or [])
+
+    if not paths:
+        raise typer.BadParameter("No audio files found.")
+
+    return paths
 
 
 def _resolve_output_dir(out: Path | None) -> Path:

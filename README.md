@@ -4,8 +4,9 @@ CLI for local Whisper transcription workflows. It can export TikTok videos into 
 
 The code is split by responsibility:
 
-- `tiktokexport.core`: shared media, ffmpeg, filename, and Whisper transcription logic.
-- `tiktokexport.tiktok`: TikTok download/export workflow and TikTok Markdown rendering.
+- `tiktokexport.core`: shared media, ffmpeg, file naming/saving, Markdown rendering, common models, and Whisper transcription logic.
+- `tiktokexport.tiktok`: TikTok download workflow, TikTok pipeline, and TikTok-specific models.
+- `tiktokexport.audio_file`: local audio-file discovery and transcription pipeline.
 - `tiktokexport.cli`: Typer command layer.
 
 ## Install
@@ -38,6 +39,12 @@ TXT file with one URL per line:
 
 ```powershell
 uv run tiktokexport export --file links.txt
+```
+
+Multiple URLs directly:
+
+```powershell
+uv run tiktokexport export "https://www.tiktok.com/@one/video/123" "https://www.tiktok.com/@two/video/456"
 ```
 
 Useful flags:
@@ -83,6 +90,13 @@ Multiple audio files:
 uv run tiktokexport transcribe "C:\audio\meeting.wav" "C:\audio\memo.m4a"
 ```
 
+Folder with audio files:
+
+```powershell
+uv run tiktokexport transcribe --dir "C:\audio"
+uv run tiktokexport transcribe --dir "C:\audio" --recursive
+```
+
 Useful flags:
 
 ```powershell
@@ -90,6 +104,7 @@ uv run tiktokexport transcribe "C:\audio\meeting.wav" --out "C:\vault\Transcript
 uv run tiktokexport transcribe "C:\audio\meeting.wav" --format txt
 uv run tiktokexport transcribe "C:\audio\meeting.wav" --model turbo --device auto
 uv run tiktokexport transcribe "C:\audio\bad.wav" "C:\audio\good.mp3" --fail-fast
+uv run tiktokexport transcribe --dir "C:\audio" --out "C:\vault\Transcripts"
 ```
 
 Supported audio extensions: `.aac`, `.aiff`, `.alac`, `.flac`, `.m4a`, `.mp3`, `.oga`, `.ogg`, `.opus`, `.wav`, `.wma`.

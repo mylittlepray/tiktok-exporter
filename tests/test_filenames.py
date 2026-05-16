@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tiktokexport.filenames import build_base_filename, sanitize_component, unique_base_path
+from tiktokexport.core.filenames import build_base_filename, sanitize_component, unique_base_path
 
 
 def test_sanitize_component_removes_windows_unsafe_characters() -> None:

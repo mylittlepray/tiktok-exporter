@@ -7,12 +7,13 @@ from datetime import date
 from pathlib import Path
 from typing import Protocol
 
-from ..core.filenames import build_base_filename, unique_base_path
-from ..core.transcriber import WhisperTranscriber
-from ..progress import ExportReporter
-from .downloader import TikTokDownloader
-from .markdown import MarkdownNote, render_markdown
-from .models import DownloadedVideo, ExportedNote, ExportFailure, ExportSummary
+from tiktokexport.core.files import ensure_output_dir
+from tiktokexport.core.filenames import build_base_filename, unique_base_path
+from tiktokexport.core.markdown import MarkdownDocument, render_transcript_markdown
+from tiktokexport.core.transcriber import WhisperTranscriber
+from tiktokexport.progress import ExportReporter
+from tiktokexport.tiktok.downloader import TikTokDownloader
+from tiktokexport.tiktok.models import DownloadedVideo, ExportedNote, ExportFailure, ExportSummary
 
 
 class Downloader(Protocol):
@@ -93,8 +94,7 @@ class TikTokExporter:
         transcriber: Transcriber | None = None,
         reporter: ExportReporter | None = None,
     ) -> ExportedNote:
-        output_dir = options.output_dir.expanduser().resolve()
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = ensure_output_dir(options.output_dir)
         created_at = options.created_at or date.today().isoformat()
         transcriber = transcriber or self.transcriber or WhisperTranscriber(options.model_name)
 
@@ -123,13 +123,11 @@ class TikTokExporter:
             if reporter is not None:
                 reporter.stage("Saving Markdown note and video")
             shutil.move(str(downloaded.video_path), video_path)
-            markdown = render_markdown(
-                MarkdownNote(
-                    created_at=created_at,
-                    metadata=downloaded.metadata,
-                    video_filename=video_path.name,
-                    transcript=transcript,
-                )
+            markdown = render_tiktok_markdown(
+                downloaded=downloaded,
+                created_at=created_at,
+                video_filename=video_path.name,
+                transcript=transcript,
             )
             markdown_path.write_text(markdown, encoding="utf-8")
 
@@ -139,3 +137,38 @@ class TikTokExporter:
             video_path=video_path,
         )
 
+
+def render_tiktok_markdown(
+    *,
+    downloaded: DownloadedVideo,
+    created_at: str,
+    video_filename: str,
+    transcript: str,
+) -> str:
+    metadata = downloaded.metadata
+    description = metadata.description.strip() or "Описание отсутствует."
+    return render_transcript_markdown(
+        MarkdownDocument(
+            title=f"TikTok - {metadata.account or '@unknown'}",
+            transcript=transcript,
+            frontmatter={
+                "created_at": created_at,
+                "tags": ["tiktok"],
+                "source_url": metadata.source_url,
+                "account": metadata.account,
+                "description": metadata.description,
+                "video_file": video_filename,
+            },
+            sections=(
+                (
+                    "Источник",
+                    (
+                        f"- Оригинал: {metadata.source_url}\n"
+                        f"- Аккаунт: {metadata.account or '@unknown'}\n"
+                        f"- Локальное видео: {video_filename}"
+                    ),
+                ),
+                ("Описание", description),
+            ),
+        )
+    )

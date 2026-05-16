@@ -1,6 +1,6 @@
 import pytest
 
-from tiktokexport.transcriber import TranscriptionError, _device_attempts, torch_device_report
+from tiktokexport.core.transcriber import TranscriptionError, _device_attempts, torch_device_report
 
 
 @pytest.mark.parametrize(

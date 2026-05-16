@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tiktokexport.ffmpeg import _ensure_ffmpeg_executable_name
+from tiktokexport.core.ffmpeg import _ensure_ffmpeg_executable_name
 
 
 def test_ensure_ffmpeg_executable_name_returns_existing_ffmpeg_name(tmp_path: Path) -> None:

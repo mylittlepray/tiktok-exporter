@@ -5,8 +5,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
-from .ffmpeg import ensure_ffmpeg_command_on_path
-from ..progress import ExportReporter
+from tiktokexport.core.ffmpeg import ensure_ffmpeg_command_on_path
+from tiktokexport.progress import ExportReporter
 
 
 class TranscriptionError(RuntimeError):

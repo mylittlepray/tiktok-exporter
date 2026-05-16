@@ -1,4 +1,4 @@
-from tiktokexport.downloader import _fallback_video_id, _metadata_from_info
+from tiktokexport.tiktok.downloader import _fallback_video_id, _metadata_from_info
 
 
 def test_metadata_keeps_user_supplied_source_url() -> None:

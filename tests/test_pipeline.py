@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from tiktokexport.models import DownloadedVideo, VideoMetadata
-from tiktokexport.pipeline import ExportOptions, TikTokExporter
+from tiktokexport.tiktok.models import DownloadedVideo, VideoMetadata
+from tiktokexport.tiktok.pipeline import ExportOptions, TikTokExporter
 
 
 class FakeDownloader:

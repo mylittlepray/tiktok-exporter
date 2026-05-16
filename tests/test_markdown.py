@@ -26,7 +26,7 @@ def test_render_markdown_contains_frontmatter_and_transcript() -> None:
     parsed = yaml.safe_load(frontmatter)
 
     assert parsed["created_at"] == "2026-05-14"
-    assert parsed["tags"] == ["tiktok"]
+    assert parsed["tags"] == ["transcription", "tiktok"]
     assert parsed["account"] == "@author"
     assert parsed["video_file"] == "@author - Video description.mp4"
     assert "Оригинал:" not in body

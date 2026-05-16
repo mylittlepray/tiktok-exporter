@@ -28,10 +28,12 @@ WINDOWS_RESERVED_NAMES = {
     "lpt9",
 }
 
+FILENAME_UNSAFE_PATTERN = r"[<>:\"/\\|?*#^\[\]\x00-\x1f]"
+
 
 def sanitize_component(value: str, fallback: str = "unknown", max_length: int = 80) -> str:
     value = value.strip().lstrip("@").lower()
-    value = re.sub(r"[<>:\"/\\|?*\x00-\x1f]", " ", value)
+    value = re.sub(FILENAME_UNSAFE_PATTERN, " ", value)
     value = re.sub(r"\s+", "_", value)
     value = re.sub(r"[^\w.-]+", "_", value, flags=re.UNICODE)
     value = value.strip("._-")
@@ -46,7 +48,7 @@ def sanitize_component(value: str, fallback: str = "unknown", max_length: int = 
 
 def sanitize_filename(value: str, fallback: str = "untitled", max_length: int = 120) -> str:
     value = value.strip()
-    value = re.sub(r"[<>:\"/\\|?*\x00-\x1f]", " ", value)
+    value = re.sub(FILENAME_UNSAFE_PATTERN, " ", value)
     value = re.sub(r"\s+", " ", value)
     value = value.strip(" .")
 
@@ -92,4 +94,3 @@ def unique_base_path(output_dir: Path, base: str, suffixes: tuple[str, ...]) -> 
         counter += 1
 
     return candidate
-

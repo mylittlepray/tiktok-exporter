@@ -26,7 +26,7 @@ def test_unique_base_path_adds_counter_when_any_output_exists(tmp_path: Path) ->
 
 
 def test_sanitize_filename_keeps_spaces_and_removes_unsafe_characters() -> None:
-    assert sanitize_filename('@Author - Bad: Name?/<>*"') == "@Author - Bad Name"
+    assert sanitize_filename('@Author - Bad: Name?/<>*"#^[tag]|') == "@Author - Bad Name tag"
 
 
 def test_summarize_sentence_for_filename_prefers_sentence_boundary() -> None:

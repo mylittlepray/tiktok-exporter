@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from tiktokexport.core.filenames import build_base_filename, sanitize_component, unique_base_path
+from tiktokexport.core.filenames import (
+    build_base_filename,
+    sanitize_component,
+    sanitize_filename,
+    summarize_sentence_for_filename,
+    unique_base_path,
+)
 
 
 def test_sanitize_component_removes_windows_unsafe_characters() -> None:
@@ -16,4 +22,20 @@ def test_unique_base_path_adds_counter_when_any_output_exists(tmp_path: Path) ->
 
     assert unique_base_path(tmp_path, "2026-05-14_author_123", (".md", ".mp4")) == (
         "2026-05-14_author_123_2"
+    )
+
+
+def test_sanitize_filename_keeps_spaces_and_removes_unsafe_characters() -> None:
+    assert sanitize_filename('@Author - Bad: Name?/<>*"') == "@Author - Bad Name"
+
+
+def test_summarize_sentence_for_filename_prefers_sentence_boundary() -> None:
+    text = "First sentence. Second sentence is too long for the filename limit."
+
+    assert summarize_sentence_for_filename(text, limit=30) == "First sentence."
+
+
+def test_summarize_sentence_for_filename_uses_first_limit_when_boundary_too_short() -> None:
+    assert summarize_sentence_for_filename("A. Long sentence continues here", limit=20) == (
+        "A. Long sentence con"
     )

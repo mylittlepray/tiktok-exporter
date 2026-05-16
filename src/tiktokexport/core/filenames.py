@@ -44,6 +44,39 @@ def sanitize_component(value: str, fallback: str = "unknown", max_length: int = 
     return value[:max_length].rstrip("._-") or fallback
 
 
+def sanitize_filename(value: str, fallback: str = "untitled", max_length: int = 120) -> str:
+    value = value.strip()
+    value = re.sub(r"[<>:\"/\\|?*\x00-\x1f]", " ", value)
+    value = re.sub(r"\s+", " ", value)
+    value = value.strip(" .")
+
+    if not value:
+        value = fallback
+    if value.lower() in WINDOWS_RESERVED_NAMES:
+        value = f"{value}_"
+
+    return value[:max_length].rstrip(" .") or fallback
+
+
+def summarize_sentence_for_filename(value: str, limit: int = 50) -> str:
+    value = re.sub(r"\s+", " ", value.strip())
+    if len(value) <= limit:
+        return value
+
+    sentence_ends = {".", "!", "?", "。", "！", "？", "…"}
+    last_sentence_end = -1
+    for index, char in enumerate(value[:limit]):
+        if char in sentence_ends:
+            last_sentence_end = index
+
+    if last_sentence_end >= 0:
+        candidate = value[: last_sentence_end + 1].strip()
+        if len(candidate) >= 5:
+            return candidate
+
+    return value[:limit].strip()
+
+
 def build_base_filename(created_at: str, account: str, video_id: str) -> str:
     author = sanitize_component(account, fallback="unknown")
     identifier = sanitize_component(video_id, fallback="video")

@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Protocol
 
 from tiktokexport.core.files import ensure_output_dir
-from tiktokexport.core.filenames import build_base_filename, unique_base_path
+from tiktokexport.core.filenames import (
+    sanitize_filename,
+    summarize_sentence_for_filename,
+    unique_base_path,
+)
 from tiktokexport.core.markdown import MarkdownDocument, render_transcript_markdown
 from tiktokexport.core.transcriber import WhisperTranscriber
 from tiktokexport.progress import ExportReporter
@@ -111,10 +115,9 @@ class TikTokExporter:
             transcript = transcriber.transcribe(downloaded.video_path, reporter=reporter)
 
             video_suffix = downloaded.video_path.suffix or ".mp4"
-            base = build_base_filename(
-                created_at,
+            base = build_tiktok_base_filename(
                 downloaded.metadata.account,
-                downloaded.metadata.video_id,
+                downloaded.metadata.description,
             )
             base = unique_base_path(output_dir, base, (".md", video_suffix))
             video_path = output_dir / f"{base}{video_suffix}"
@@ -153,22 +156,20 @@ def render_tiktok_markdown(
             transcript=transcript,
             frontmatter={
                 "created_at": created_at,
-                "tags": ["tiktok"],
+                "tags": ["transcription", "tiktok"],
                 "source_url": metadata.source_url,
                 "account": metadata.account,
                 "description": metadata.description,
                 "video_file": video_filename,
             },
-            sections=(
-                (
-                    "Источник",
-                    (
-                        f"- Оригинал: {metadata.source_url}\n"
-                        f"- Аккаунт: {metadata.account or '@unknown'}\n"
-                        f"- Локальное видео: {video_filename}"
-                    ),
-                ),
-                ("Описание", description),
-            ),
+            sections=(("Описание", description),),
+            transcript_heading="Содержание",
         )
     )
+
+
+def build_tiktok_base_filename(account: str, description: str) -> str:
+    account_part = sanitize_filename(account or "@unknown", fallback="@unknown", max_length=40)
+    description_part = summarize_sentence_for_filename(description, limit=50)
+    description_part = sanitize_filename(description_part, fallback="без описания", max_length=50)
+    return f"{account_part} - {description_part}"

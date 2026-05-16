@@ -12,6 +12,7 @@ class MarkdownDocument:
     transcript: str
     frontmatter: dict[str, Any]
     sections: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    transcript_heading: str = "Транскрипт"
 
 
 def render_transcript_markdown(document: MarkdownDocument) -> str:
@@ -32,7 +33,6 @@ def render_transcript_markdown(document: MarkdownDocument) -> str:
         f"---\n{yaml_body}\n---\n\n"
         f"# {document.title}\n\n"
         f"{sections}"
-        f"## Транскрипт\n\n"
+        f"## {document.transcript_heading}\n\n"
         f"{transcript}\n"
     )
-

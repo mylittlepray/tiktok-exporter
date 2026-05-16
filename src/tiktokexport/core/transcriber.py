@@ -38,7 +38,7 @@ def torch_device_report() -> dict[str, str | bool | int]:
 
 
 class WhisperTranscriber:
-    def __init__(self, model_name: str = "turbo", device: str = "auto") -> None:
+    def __init__(self, model_name: str = "large-v3-turbo", device: str = "auto") -> None:
         self.model_name = model_name
         self.device = device
         self._active_device: str | None = None

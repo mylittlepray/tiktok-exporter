@@ -21,7 +21,7 @@ class FakeDownloader:
             metadata=VideoMetadata(
                 source_url=url,
                 account="@author",
-                description="Description",
+                description="Short description.",
                 video_id="123",
             ),
             video_path=video_path,
@@ -47,8 +47,8 @@ def test_export_urls_continues_after_failures_and_writes_successes(tmp_path: Pat
     assert len(summary.successes) == 1
     assert len(summary.failures) == 1
     assert summary.failures[0].source_url == "https://www.tiktok.com/@bad/video/456"
-    assert (tmp_path / "2026-05-14_author_123.mp4").read_bytes() == b"video"
-    markdown = (tmp_path / "2026-05-14_author_123.md").read_text(encoding="utf-8")
+    assert (tmp_path / "@author - Short description.mp4").read_bytes() == b"video"
+    markdown = (tmp_path / "@author - Short description.md").read_text(encoding="utf-8")
     assert "Transcript text." in markdown
 
 
@@ -65,4 +65,4 @@ def test_export_urls_fail_fast_stops_after_first_failure(tmp_path: Path) -> None
 
     assert len(summary.successes) == 0
     assert len(summary.failures) == 1
-    assert not (tmp_path / "2026-05-14_author_123.md").exists()
+    assert not (tmp_path / "@author - Short description.md").exists()

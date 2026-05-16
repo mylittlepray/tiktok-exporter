@@ -18,7 +18,7 @@ def test_render_markdown_contains_frontmatter_and_transcript() -> None:
             video_path=Path("unused.mp4"),
         ),
         created_at="2026-05-14",
-        video_filename="2026-05-14_author_123.mp4",
+        video_filename="@author - Video description.mp4",
         transcript="Full transcript.",
     )
 
@@ -28,6 +28,10 @@ def test_render_markdown_contains_frontmatter_and_transcript() -> None:
     assert parsed["created_at"] == "2026-05-14"
     assert parsed["tags"] == ["tiktok"]
     assert parsed["account"] == "@author"
-    assert parsed["video_file"] == "2026-05-14_author_123.mp4"
-    assert "## Транскрипт" in body
+    assert parsed["video_file"] == "@author - Video description.mp4"
+    assert "Оригинал:" not in body
+    assert "Аккаунт:" not in body
+    assert "Локальное видео:" not in body
+    assert "## Описание" in body
+    assert "## Содержание" in body
     assert "Full transcript." in body

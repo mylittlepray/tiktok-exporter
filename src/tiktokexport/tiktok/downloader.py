@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 from typing import Any
 
@@ -81,7 +82,7 @@ def _metadata_from_info(info: dict[str, Any], fallback_url: str) -> VideoMetadat
     source_url = fallback_url
     video_id = str(info.get("id") or _fallback_video_id(source_url))
     description = str(info.get("description") or info.get("title") or "").strip()
-    account = _account_from_info(info)
+    account = _account_from_info(info, fallback_url=fallback_url)
 
     return VideoMetadata(
         source_url=source_url,
@@ -91,21 +92,39 @@ def _metadata_from_info(info: dict[str, Any], fallback_url: str) -> VideoMetadat
     )
 
 
-def _account_from_info(info: dict[str, Any]) -> str:
-    raw = (
-        info.get("uploader_id")
-        or info.get("channel_id")
-        or info.get("creator")
-        or info.get("uploader")
-        or info.get("channel")
-        or "unknown"
-    )
-    account = str(raw).strip()
+def _account_from_info(info: dict[str, Any], fallback_url: str = "") -> str:
+    for raw in _account_candidates(info, fallback_url):
+        account = str(raw).strip().removeprefix("@")
+        if account and not account.isdigit():
+            return f"@{account}"
+
+    account = str(info.get("uploader_id") or info.get("channel_id") or "unknown").strip()
     if not account:
         account = "unknown"
     if not account.startswith("@"):
         account = f"@{account}"
     return account
+
+
+def _account_candidates(info: dict[str, Any], fallback_url: str) -> list[str]:
+    candidates: list[str] = []
+    for key in ("uploader", "channel", "creator", "artist", "uploader_id", "channel_id"):
+        value = info.get(key)
+        if value:
+            candidates.append(str(value))
+
+    for key in ("webpage_url", "original_url", "url"):
+        value = info.get(key)
+        if value:
+            candidates.extend(_accounts_from_url(str(value)))
+    if fallback_url:
+        candidates.extend(_accounts_from_url(fallback_url))
+
+    return candidates
+
+
+def _accounts_from_url(url: str) -> list[str]:
+    return [match.group(1) for match in re.finditer(r"/@([^/?#]+)", url)]
 
 
 def _fallback_video_id(source_url: str) -> str:

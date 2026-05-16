@@ -1,6 +1,12 @@
 # TikTokExport
 
-CLI for saving TikTok videos as Obsidian-friendly Markdown notes. It downloads the video, transcribes it with local Whisper, and writes a `.md` file next to the saved video.
+CLI for local Whisper transcription workflows. It can export TikTok videos into Obsidian-friendly Markdown notes and transcribe local audio files into Markdown or plain text.
+
+The code is split by responsibility:
+
+- `tiktokexport.core`: shared media, ffmpeg, filename, and Whisper transcription logic.
+- `tiktokexport.tiktok`: TikTok download/export workflow and TikTok Markdown rendering.
+- `tiktokexport.cli`: Typer command layer.
 
 ## Install
 
@@ -20,7 +26,7 @@ By default, exports are written to the project `export/` folder. You can set a d
 uv run tiktokexport config init --out "C:\path\to\Obsidian\TikTok"
 ```
 
-## Export
+## Export TikTok
 
 Single URL:
 
@@ -62,6 +68,40 @@ For each video, TikTokExport creates files like:
 ```
 
 The Markdown note contains YAML frontmatter with `created_at`, `tags: [tiktok]`, the original URL, account, description, and local video filename, followed by the full Whisper transcript.
+
+## Transcribe Audio Files
+
+Single audio file:
+
+```powershell
+uv run tiktokexport transcribe "C:\audio\voice-note.mp3"
+```
+
+Multiple audio files:
+
+```powershell
+uv run tiktokexport transcribe "C:\audio\meeting.wav" "C:\audio\memo.m4a"
+```
+
+Useful flags:
+
+```powershell
+uv run tiktokexport transcribe "C:\audio\meeting.wav" --out "C:\vault\Transcripts"
+uv run tiktokexport transcribe "C:\audio\meeting.wav" --format txt
+uv run tiktokexport transcribe "C:\audio\meeting.wav" --model turbo --device auto
+uv run tiktokexport transcribe "C:\audio\bad.wav" "C:\audio\good.mp3" --fail-fast
+```
+
+Supported audio extensions: `.aac`, `.aiff`, `.alac`, `.flac`, `.m4a`, `.mp3`, `.oga`, `.ogg`, `.opus`, `.wav`, `.wma`.
+
+Audio transcripts are written with names like:
+
+```text
+2026-05-14_voice-note.md
+2026-05-14_meeting.txt
+```
+
+Markdown audio transcripts contain YAML frontmatter with `created_at`, `tags: [transcription, audio]`, `source_file`, and `media_type`, followed by the transcript.
 
 ## Transcription device and progress
 

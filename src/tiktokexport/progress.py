@@ -19,7 +19,10 @@ from rich.text import Text
 
 
 class ExportReporter(Protocol):
-    def start_batch(self, total: int) -> None:
+    def start_batch(self, total: int, item_label: str = "TikTok video") -> None:
+        ...
+
+    def start_item(self, index: int, total: int, label: str, value: str) -> None:
         ...
 
     def start_video(self, index: int, total: int, url: str) -> None:
@@ -78,12 +81,15 @@ class RichExportReporter:
     def __exit__(self, *exc_info: object) -> None:
         self.progress.stop()
 
-    def start_batch(self, total: int) -> None:
-        self.console.print(f"[bold]Exporting {total} TikTok video(s)[/bold]")
+    def start_batch(self, total: int, item_label: str = "TikTok video") -> None:
+        self.console.print(f"[bold]Processing {total} {item_label}(s)[/bold]")
+
+    def start_item(self, index: int, total: int, label: str, value: str) -> None:
+        self.console.rule(f"{label} {index}/{total}")
+        self.console.print(value)
 
     def start_video(self, index: int, total: int, url: str) -> None:
-        self.console.rule(f"Video {index}/{total}")
-        self.console.print(url)
+        self.start_item(index, total, "Video", url)
 
     def stage(self, message: str) -> None:
         self.current_stage = message

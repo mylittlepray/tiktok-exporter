@@ -1,7 +1,7 @@
 [project]
 name = "tiktokexport"
 version = "0.1.0"
-description = "Export TikTok videos into Obsidian-friendly Markdown notes with local Whisper transcription."
+description = "Local Whisper transcription workflows for TikTok videos and audio files."
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [

@@ -3,7 +3,7 @@ from pathlib import Path
 import typer
 import pytest
 
-from tiktokexport.cli import _resolve_output_dir, _validate_device
+from tiktokexport.cli import _resolve_output_dir, _validate_device, _validate_transcript_format
 from tiktokexport.config import AppConfig
 
 
@@ -26,3 +26,12 @@ def test_validate_device_normalizes_known_values() -> None:
 def test_validate_device_rejects_unknown_values() -> None:
     with pytest.raises(typer.BadParameter):
         _validate_device("metal")
+
+
+def test_validate_transcript_format_normalizes_known_values() -> None:
+    assert _validate_transcript_format(".TXT") == "txt"
+
+
+def test_validate_transcript_format_rejects_unknown_values() -> None:
+    with pytest.raises(typer.BadParameter):
+        _validate_transcript_format("srt")

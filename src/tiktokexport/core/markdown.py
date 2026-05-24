@@ -7,32 +7,23 @@ import yaml
 
 
 @dataclass(frozen=True)
-class MarkdownDocument:
+class MarkdownNote:
     title: str
-    transcript: str
     frontmatter: dict[str, Any]
     sections: tuple[tuple[str, str], ...] = field(default_factory=tuple)
-    transcript_heading: str = "Транскрипт"
 
 
-def render_transcript_markdown(document: MarkdownDocument) -> str:
+def render_markdown_note(note: MarkdownNote) -> str:
     yaml_body = yaml.safe_dump(
-        document.frontmatter,
+        note.frontmatter,
         allow_unicode=True,
         sort_keys=False,
         default_flow_style=False,
     ).strip()
-    transcript = document.transcript.strip() or "Текст не распознан."
     sections = "".join(
         f"## {heading}\n\n{body.strip()}\n\n"
-        for heading, body in document.sections
+        for heading, body in note.sections
         if body.strip()
     )
 
-    return (
-        f"---\n{yaml_body}\n---\n\n"
-        f"# {document.title}\n\n"
-        f"{sections}"
-        f"## {document.transcript_heading}\n\n"
-        f"{transcript}\n"
-    )
+    return f"---\n{yaml_body}\n---\n\n# {note.title}\n\n{sections}".rstrip() + "\n"

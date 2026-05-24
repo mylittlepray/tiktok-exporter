@@ -7,4 +7,11 @@ dist/
 build/
 *.egg-info/
 *.pyc
-export/
+export/*
+!export/.gitkeep
+reports/*
+!reports/.gitkeep
+exported_links/*
+!exported_links/.gitkeep
+*.json
+*.txt

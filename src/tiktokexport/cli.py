@@ -17,16 +17,29 @@ from tiktokexport.audio_file.pipeline import (
     collect_audio_files,
     normalize_transcript_format,
 )
-from tiktokexport.config import default_output_dir, init_config, load_config
+from tiktokexport.config import AppConfig, default_output_dir, init_config, load_config
 from tiktokexport.core.transcriber import torch_device_report
 from tiktokexport.links import parse_links_file
 from tiktokexport.progress import RichExportReporter
-from tiktokexport.tiktok.pipeline import ExportOptions, TikTokExporter
+from tiktokexport.tiktok.link_exporter import (
+    LinkSection,
+    export_tiktok_links,
+    load_tiktok_link_blocks,
+    normalize_link_sections,
+)
+from tiktokexport.tiktok.models import ExportFailure, ExportOptions
+from tiktokexport.tiktok.pipeline import TikTokExporter
 
 
-app = typer.Typer(help="Run local Whisper transcription workflows.")
+app = typer.Typer(help="Export TikTok media and transcribe local audio.")
+tiktok_app = typer.Typer(help="Export TikTok video and photo posts.")
+audio_app = typer.Typer(help="Transcribe local audio files.")
 config_app = typer.Typer(help="Manage TikTokExport configuration.")
+
+app.add_typer(tiktok_app, name="tiktok")
+app.add_typer(audio_app, name="audio")
 app.add_typer(config_app, name="config")
+
 console = Console()
 
 
@@ -36,7 +49,7 @@ def init_config_command(
         ...,
         "--out",
         "-o",
-        help="Default folder for Markdown notes and downloaded videos.",
+        help="Default folder for exported notes and media.",
     ),
 ) -> None:
     path = init_config(out)
@@ -44,9 +57,9 @@ def init_config_command(
     console.print(f"Default output folder: [bold]{out.expanduser().resolve()}[/bold]")
 
 
-@app.command("export")
-def export_command(
-    urls: Optional[list[str]] = typer.Argument(None, help="One or more TikTok URLs to export."),
+@tiktok_app.command("export")
+def tiktok_export_command(
+    urls: Optional[list[str]] = typer.Argument(None, help="One or more TikTok URLs."),
     file: Optional[Path] = typer.Option(
         None,
         "--file",
@@ -59,16 +72,21 @@ def export_command(
         "-o",
         help="Output folder. Overrides the saved config and project export/ default.",
     ),
+    transcribe: bool = typer.Option(
+        True,
+        "--transcribe/--no-transcribe",
+        help="Transcribe TikTok videos with Whisper. Photo slideshows are never transcribed.",
+    ),
     model: str = typer.Option(
         "turbo",
         "--model",
         "-m",
-        help="Local Whisper model name.",
+        help="Local Whisper model name when transcription is enabled.",
     ),
     device: str = typer.Option(
         "auto",
         "--device",
-        help="Transcription device: auto, cuda, or cpu. auto uses CUDA first when PyTorch can see it.",
+        help="Transcription device: auto, cuda, or cpu.",
     ),
     cookies: Optional[Path] = typer.Option(
         None,
@@ -86,15 +104,14 @@ def export_command(
         help="Stop batch processing after the first failed URL.",
     ),
 ) -> None:
-    urls = _collect_urls(urls=urls, file=file)
+    collected_urls = _collect_urls(urls=urls, file=file)
     device = _validate_device(device)
     output_dir = _resolve_output_dir(out)
-    if cookies is not None and (not cookies.exists() or not cookies.is_file()):
-        raise typer.BadParameter(f"Cookies file does not exist: {cookies}")
+    _validate_cookies(cookies)
 
     with RichExportReporter(console) as reporter:
         summary = TikTokExporter().export_urls(
-            urls,
+            collected_urls,
             ExportOptions(
                 output_dir=output_dir,
                 model_name=model,
@@ -102,22 +119,68 @@ def export_command(
                 cookies_from_browser=cookies_from_browser,
                 fail_fast=fail_fast,
                 device=device,
+                transcribe=transcribe,
             ),
             reporter=reporter,
         )
 
     if summary.failures:
-        _print_failures(summary.failures)
+        _print_report_path(summary.report_path)
+        _print_tiktok_failures(summary.failures)
         raise typer.Exit(code=1)
+    if summary.interrupted:
+        console.print("[yellow]Interrupted[/yellow]: export report was saved.")
+        _print_report_path(summary.report_path)
+        raise typer.Exit(code=130)
 
-    console.print(f"[green]Done[/green]: exported {len(summary.successes)} video(s).")
+    console.print(f"[green]Done[/green]: exported {len(summary.successes)} TikTok post(s).")
+    _print_report_path(summary.report_path)
 
 
-@app.command("transcribe")
-def transcribe_command(
+@tiktok_app.command("export-links")
+def tiktok_export_links_command(
+    file: Path = typer.Option(
+        ...,
+        "--file",
+        "-f",
+        help="TikTok user_data_tiktok.json export file.",
+    ),
+    section: Optional[list[str]] = typer.Option(
+        None,
+        "--section",
+        "-s",
+        help="Section to export: favorite, likes, or both. Can be passed multiple times.",
+    ),
+    out: Optional[Path] = typer.Option(
+        None,
+        "--out",
+        "-o",
+        help="Output folder for exported TXT link files. Defaults to exported_links/.",
+    ),
+) -> None:
+    if not file.exists() or not file.is_file():
+        raise typer.BadParameter(f"TikTok JSON file does not exist: {file}")
+
+    blocks = load_tiktok_link_blocks(file)
+    _print_link_block_counts(blocks.favorite_videos, blocks.like_list)
+    selected_sections = _resolve_link_sections(section)
+    exported = export_tiktok_links(
+        blocks,
+        selected_sections,
+        output_dir=out.expanduser().resolve() if out is not None else None,
+    )
+
+    console.print(
+        f"[green]Done[/green]: exported {exported.link_count} link(s) to "
+        f"[bold]{exported.path}[/bold]"
+    )
+
+
+@audio_app.command("transcribe")
+def audio_transcribe_command(
     files: Optional[list[Path]] = typer.Argument(
         None,
-        help="One or more local audio files to transcribe.",
+        help="One or more local audio files.",
     ),
     directory: Optional[Path] = typer.Option(
         None,
@@ -256,13 +319,15 @@ def _collect_audio_paths(
 
 
 def _resolve_output_dir(out: Path | None) -> Path:
+    config = load_config()
+    return _resolve_output_dir_from_config(out, config)
+
+
+def _resolve_output_dir_from_config(out: Path | None, config: AppConfig) -> Path:
     if out is not None:
         return out.expanduser().resolve()
-
-    config = load_config()
     if config.output_dir is not None:
         return config.output_dir.expanduser().resolve()
-
     return default_output_dir().expanduser().resolve()
 
 
@@ -280,8 +345,13 @@ def _validate_transcript_format(output_format: str) -> TranscriptFormat:
         raise typer.BadParameter(str(exc)) from exc
 
 
-def _print_failures(failures: tuple) -> None:
-    table = Table(title="Failed URLs")
+def _validate_cookies(cookies: Path | None) -> None:
+    if cookies is not None and (not cookies.exists() or not cookies.is_file()):
+        raise typer.BadParameter(f"Cookies file does not exist: {cookies}")
+
+
+def _print_tiktok_failures(failures: tuple[ExportFailure, ...]) -> None:
+    table = Table(title="Failed TikTok URLs")
     table.add_column("URL", overflow="fold")
     table.add_column("Error", overflow="fold")
 
@@ -289,6 +359,34 @@ def _print_failures(failures: tuple) -> None:
         table.add_row(failure.source_url, failure.error)
 
     console.print(table)
+
+
+def _print_report_path(report_path: Path | None) -> None:
+    if report_path is not None:
+        console.print(f"Export report: [bold]{report_path}[/bold]")
+
+
+def _print_link_block_counts(favorite_links: tuple[str, ...], like_links: tuple[str, ...]) -> None:
+    table = Table(title="TikTok Link Blocks")
+    table.add_column("Block")
+    table.add_column("Links", justify="right")
+    table.add_row("Favorite Videos", str(len(favorite_links)))
+    table.add_row("Like List", str(len(like_links)))
+    console.print(table)
+
+
+def _resolve_link_sections(section: list[str] | None) -> tuple[LinkSection, ...]:
+    if section:
+        try:
+            return normalize_link_sections(section)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+
+    raw = typer.prompt("Save which links? favorite, likes, or both", default="both")
+    try:
+        return normalize_link_sections([raw])
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 def _print_audio_failures(failures: tuple[AudioTranscriptionFailure, ...]) -> None:

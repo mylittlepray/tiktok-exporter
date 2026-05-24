@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from typing import Protocol, cast
+from typing import cast
 
 from tiktokexport.audio_file.models import (
     AudioTranscriptionFailure,
@@ -14,21 +14,13 @@ from tiktokexport.audio_file.models import (
 from tiktokexport.core.ffmpeg import AUDIO_SUFFIXES, is_audio_file
 from tiktokexport.core.files import ensure_output_dir
 from tiktokexport.core.filenames import sanitize_component, unique_base_path
-from tiktokexport.core.markdown import MarkdownDocument, render_transcript_markdown
+from tiktokexport.core.markdown import MarkdownNote, render_markdown_note
+from tiktokexport.core.ports import Transcriber
 from tiktokexport.core.transcriber import WhisperTranscriber
 from tiktokexport.progress import ExportReporter
 
 
 SUPPORTED_TRANSCRIPT_FORMATS = frozenset({"md", "txt"})
-
-
-class Transcriber(Protocol):
-    def transcribe(
-        self,
-        media_path: Path,
-        reporter: ExportReporter | None = None,
-    ) -> str:
-        ...
 
 
 class AudioFileTranscriber:
@@ -149,16 +141,16 @@ def render_audio_transcript(
     if output_format == "txt":
         return f"{transcript}\n"
 
-    return render_transcript_markdown(
-        MarkdownDocument(
+    return render_markdown_note(
+        MarkdownNote(
             title=source_path.stem,
-            transcript=transcript,
             frontmatter={
                 "created_at": created_at,
                 "tags": ["transcription", "audio"],
                 "source_file": source_path.name,
                 "media_type": "audio",
             },
+            sections=(("Транскрипт", transcript),),
         )
     )
 
